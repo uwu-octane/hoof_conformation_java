@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Segmentation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        .results {
+            margin-top: 20px;
+        }
+        .result {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+        }
+        .result p {
+            margin: 0;
+            padding-left: 10px;
+        }
+        .result.ok {
+            color: green;
+        }
+        .result.error {
+            color: red;
+        }
+        button {
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+<h1>Image Segmentation</h1>
+
+<!-- 图片上传表单 -->
+<form id="uploadForm" enctype="multipart/form-data">
+    <label for="model">Select Model:</label>
+    <select id="model" name="model">
+        <option value="Cascade_Mask_RCNN">Cascade Mask RCNN</option>
+        <option value="Mask_RCNN_R50">Mask RCNN R50</option>
+        <option value="Mask_RCNN_R101">Mask RCNN R101</option>
+        <option value="ALL">ALL</option>
+    </select>
+    <br><br>
+    <input type="file" id="fileInput" name="files" multiple accept="image/*">
+    <button type="button" onclick="uploadImages()">Upload Images</button>
+</form>
+
+<!-- 复选框：全选 -->
+<input type="checkbox" id="selectAll" onclick="selectAllOk()"> Select All (status: OK)
+
+<!-- 显示上传结果 -->
+<div class="results" id="results"></div>
+
+<!-- Segment 按钮 -->
+<button type="button" onclick="segmentSelectedImages()">Segment Selected Images</button>
+
+<script>
+    let uploadedFiles = []; // 用于存储上传的图片信息
+    let segmentedResults = []; // 存储分割结果的数组
+
+    // 上传图片
+    function uploadImages() {
+        const formData = new FormData(document.getElementById('uploadForm'));
+        const files = document.getElementById('fileInput').files;
+
+        // 先清空formData中的旧文件，避免重复添加
+        formData.delete('files');
+
+        // 检查是否有文件上传
+        if (files.length === 0) {
+            console.error("No files selected for upload.");
+            return;
+        }
+
+        // 添加文件到FormData
+        for (let i = 0; i < files.length; i++) {
+            formData.append('files', files[i]);
+            uploadedFiles.push({
+                file: files[i],
+                name: files[i].name,
+                status: 'pending',
+                url: URL.createObjectURL(files[i]),
+                id: uploadedFiles.length
+            });
+        }
+
+        // 将图片上传
+        fetch('/api/upload', {
+            method: 'POST',
+            body: formData
+        })
+            .then(response => response.json())
+            .then(data => updateResults(data))
+            .catch(error => console.error('Error:', error));
+    }
+
+    // 更新上传结果
+    function updateResults(data) {
+        const resultsDiv = document.getElementById('results');
+        resultsDiv.innerHTML = ''; // 清空旧结果
+
+        // 遍历所有已上传文件，并更新UI
+        uploadedFiles.forEach((file, index) => {
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'result ' + (data[index].status === 'ok' ? 'ok' : 'error');
+
+            // 图片复选框
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.disabled = data[index].status !== 'ok'; // 仅 status 为 ok 的图片可选
+            checkbox.value = file.id;
+            resultDiv.appendChild(checkbox);
+
+            // 图片名称作为链接
+            const fileNameLink = document.createElement('a');
+            fileNameLink.href = file.url;
+            fileNameLink.target = '_blank'; // 新页面打开
+            fileNameLink.textContent = file.name;
+            resultDiv.appendChild(fileNameLink);
+
+            // 状态信息
+            const status = document.createElement('p');
+            status.textContent = ` - status: ${data[index].status}`;
+            resultDiv.appendChild(status);
+
+            // 如果上传失败，显示重新上传按钮
+            if (data[index].status !== 'ok') {
+                const retryButton = document.createElement('button');
+                retryButton.textContent = 'Retry';
+                retryButton.onclick = () => retryUpload(file);
+                resultDiv.appendChild(retryButton);
+            }
+
+            resultsDiv.appendChild(resultDiv);
+        });
+    }
+
+    // 重新上传失败的图片
+    function retryUpload(file) {
+        const formData = new FormData();
+        formData.append('files', file.file);
+
+        fetch('/api/upload', {
+            method: 'POST',
+            body: formData
+        })
+            .then(response => response.json())
+            .then(data => {
+                file.status = data[0].status;
+                updateResults([data[0]]); // 更新单个文件的结果
+            })
+            .catch(error => console.error('Error:', error));
+    }
+
+    // 全选仅 status 为 OK 的图片
+    function selectAllOk() {
+        const checkboxes = document.querySelectorAll('#results input[type="checkbox"]');
+        checkboxes.forEach(checkbox => {
+            if (!checkbox.disabled) {
+                checkbox.checked = document.getElementById('selectAll').checked;
+            }
+        });
+    }
+
+    // 发送选中的图片进行分割处理
+    function segmentSelectedImages() {
+        const selectedFiles = [];
+        const checkboxes = document.querySelectorAll('#results input[type="checkbox"]:checked');
+        checkboxes.forEach(checkbox => {
+            const file = uploadedFiles.find(f => f.id == checkbox.value);
+            if (file) selectedFiles.push(file.name);
+        });
+
+        if (selectedFiles.length === 0) {
+            alert('Please select images to segment.');
+            return;
+        }
+
+        const selectedModel = document.getElementById('model').value;
+
+        const requestData = {
+            files: selectedFiles,  // 传递图片名称的数组
+            model: selectedModel   // 传递选中的模型类型
+        };
+
+        fetch('/api/segment', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestData)
+        })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Segmentation completed:', data);
+                segmentedResults = data; // 假设返回的数据是分割后的文件内容
+                const fileNames = segmentedResults.map(result => result.fileName).join('.');
+                // 这里添加GET请求来获取分割结果并更新网页
+                fetch('/api/getSegmentationResults?files=${encodeURIComponent(fileNames)}')
+                    .then(response => response.json())
+                    .then(resultData => {
+                        updateResults(resultData);  // 使用之前的 updateResults 函数更新UI
+                    })
+                    .catch(error => console.error('Error fetching segmentation results:', error));
+
+                showSaveButtons(segmentedResults);
+            })
+            .catch(error => console.error('Error:', error));
+    }
+
+    // 显示保存按钮
+    function showSaveButtons(results) {
+        const resultsDiv = document.getElementById('results');
+
+        results.forEach((result, index) => {
+            const saveButton = document.createElement('button');
+            saveButton.textContent = 'Save';
+            saveButton.onclick = () => saveFile(result.output, `segmented_${uploadedFiles[index].name}`);
+            resultsDiv.appendChild(saveButton);
+        });
+    }
+
+    // 保存分割结果到本地
+    function saveFile(content, filename) {
+        const blob = new Blob([content], { type: 'application/octet-stream' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url); // 释放URL对象
+    }
+</script>
+</body>
+</html>
