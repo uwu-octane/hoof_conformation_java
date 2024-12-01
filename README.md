@@ -1,5 +1,10 @@
 Dies ist ein Projekt, das zum Lernen und Üben des Spring Boot-Frameworks dient. Es enthält einige experimentelle Codeabschnitte und verfügt weder über ausführliche Kommentare noch folgt es strikt den Clean-Code-Prinzipien. Bitte nimm das nicht zu genau.
 
+![3511733091104_ pic](https://github.com/user-attachments/assets/1a95a0cb-ca5a-40c3-bdce-4895ce48c2be)
+
+![3521733091152_ pic](https://github.com/user-attachments/assets/c98d1ff7-7462-497c-871e-d646ceaab437)
+
+
 
 ![20191106AkaroNachherHLlateral_jpg rf f15428be1ad5a329118ee1ad5a8a238f](https://github.com/user-attachments/assets/dbc95920-5d64-4227-85dc-b2fa4cbc8cfe)
 
@@ -17,4 +22,5 @@ Dies ist ein Projekt, das zum Lernen und Üben des Spring Boot-Frameworks dient.
 
 
 ![conformation_20191106AkaroNachherHLlateral](https://github.com/user-attachments/assets/6aabc2f9-f6ab-458f-9739-77f36cc5d877)
+
 
